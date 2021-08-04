@@ -6,7 +6,7 @@
   <link href="https://saw96x.github.io/atom.xml" rel="self"/>
   
   <link href="https://saw96x.github.io/"/>
-  <updated>2021-08-04T07:28:14.514Z</updated>
+  <updated>2021-08-04T07:37:37.242Z</updated>
   <id>https://saw96x.github.io/</id>
   
   <author>
@@ -15,6 +15,31 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Java new ArrayList(int initialCapacity)初始化容量问题</title>
+    <link href="https://saw96x.github.io/post/%E5%88%9D%E5%A7%8B%E5%8C%96%E5%AE%B9%E9%87%8F%E9%97%AE%E9%A2%98.html"/>
+    <id>https://saw96x.github.io/post/%E5%88%9D%E5%A7%8B%E5%8C%96%E5%AE%B9%E9%87%8F%E9%97%AE%E9%A2%98.html</id>
+    <published>2021-08-04T07:35:13.000Z</published>
+    <updated>2021-08-04T07:37:37.242Z</updated>
+    
+    <content type="html"><![CDATA[<p>今天看了ArrayList源码，发现了一个不大不小的问题：</p><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">ArrayList</span><span class="token punctuation">(</span><span class="token keyword">int</span> initialCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>        <span class="token keyword">if</span> <span class="token punctuation">(</span>initialCapacity <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>            <span class="token keyword">this</span><span class="token punctuation">.</span>elementData <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Object</span><span class="token punctuation">[</span>initialCapacity<span class="token punctuation">]</span><span class="token punctuation">;</span>        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>initialCapacity <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>            <span class="token keyword">this</span><span class="token punctuation">.</span>elementData <span class="token operator">=</span> EMPTY_ELEMENTDATA<span class="token punctuation">;</span>        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token string">"Illegal Capacity: "</span><span class="token operator">+</span>                                               initialCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>        <span class="token punctuation">&#125;</span>    <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre><p>这个构造函数咋一看问题不大，给elementData底层数组分配空间嘛，初始化数组的大小了<br>但是实际使用时：</p><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Integer</span><span class="token punctuation">></span></span> a <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token punctuation">(</span><span class="token number">9</span><span class="token punctuation">)</span><span class="token punctuation">;</span>a<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre><p>抛出了IndexOutOfBoundsException</p><p>结合源码：</p><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">E</span> <span class="token function">set</span><span class="token punctuation">(</span><span class="token keyword">int</span> index<span class="token punctuation">,</span> <span class="token class-name">E</span> element<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>        <span class="token class-name">Objects</span><span class="token punctuation">.</span><span class="token function">checkIndex</span><span class="token punctuation">(</span>index<span class="token punctuation">,</span> size<span class="token punctuation">)</span><span class="token punctuation">;</span>        <span class="token class-name">E</span> oldValue <span class="token operator">=</span> <span class="token function">elementData</span><span class="token punctuation">(</span>index<span class="token punctuation">)</span><span class="token punctuation">;</span>        elementData<span class="token punctuation">[</span>index<span class="token punctuation">]</span> <span class="token operator">=</span> element<span class="token punctuation">;</span>        <span class="token keyword">return</span> oldValue<span class="token punctuation">;</span>    <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre><p>其中第一行首先检测了下标，参数是index和size，而size是元素个数，也就是说，尽管设置了数组的容量，但针对ArrayList中元素的操作，是根据元素的位置，而不是根据容量来操作。也就是说，至少得有个元素才能set它，没有元素就是set个寂寞。</p><p>因此<code>set(1,5)</code>在第一行直接抛出异常了</p><p>综上所述ArrayList(int initialCapacity) 只是<strong>让ArrayList有了容纳 initialCapacity个元素的潜力，并不能对其中的“位置”操作</strong>。</p><p>PS：这个问题在Java核心技术卷1中就有提到，但我当时直接忘了，果然看了源码才理解的透彻。</p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;p&gt;今天看了ArrayList源码，发现了一个不大不小的问题：&lt;/p&gt;
+&lt;pre class=&quot;line-numbers language-java&quot; data-language=&quot;java&quot;&gt;&lt;code class=&quot;language-java&quot;&gt;&lt;span class=&quot;t</summary>
+      
+    
+    
+    
+    
+    <category term="Java" scheme="https://saw96x.github.io/tags/Java/"/>
+    
+    <category term="源码分析" scheme="https://saw96x.github.io/tags/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/"/>
+    
+  </entry>
   
   <entry>
     <title>测试文章发布</title>
