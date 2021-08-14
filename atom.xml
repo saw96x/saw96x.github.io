@@ -6,7 +6,7 @@
   <link href="https://saw96x.github.io/atom.xml" rel="self"/>
   
   <link href="https://saw96x.github.io/"/>
-  <updated>2021-08-13T03:46:43.432Z</updated>
+  <updated>2021-08-14T01:49:03.439Z</updated>
   <id>https://saw96x.github.io/</id>
   
   <author>
@@ -15,6 +15,34 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>HotSpot虚拟机对象探秘</title>
+    <link href="https://saw96x.github.io/post/HotSpot%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%AF%B9%E8%B1%A1%E6%8E%A2%E7%A7%98.html"/>
+    <id>https://saw96x.github.io/post/HotSpot%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%AF%B9%E8%B1%A1%E6%8E%A2%E7%A7%98.html</id>
+    <published>2021-08-14T01:49:37.000Z</published>
+    <updated>2021-08-14T01:49:03.439Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="HotSpot虚拟机对象探秘"><a href="#HotSpot虚拟机对象探秘" class="headerlink" title="HotSpot虚拟机对象探秘"></a>HotSpot虚拟机对象探秘</h1><h2 id="1-对象的创建"><a href="#1-对象的创建" class="headerlink" title="1. 对象的创建"></a>1. 对象的创建</h2><h3 id="1-1-类加载检查"><a href="#1-1-类加载检查" class="headerlink" title="1.1 类加载检查"></a>1.1 类加载检查</h3><p>虚拟机遇到new之后，首先会去常量池中找这个类的<strong>符号引用</strong>，并检查这个符号引用代表的类是否已经被加载、解析和初始化过，如果找到了，就可以根据已有的信息划分空间、分配内存、初始化等等；<strong>如果没找到，那必须先执行相应的类加载过程</strong>，类加载过程以后的笔记在详细说明。</p><h3 id="1-2-内存分配"><a href="#1-2-内存分配" class="headerlink" title="1.2 内存分配"></a>1.2 内存分配</h3><p>类加载检查通过之后，虚拟机将为新生对象分配内存，所需内存大小在类加载完成后就已经完全确定了，<strong>虚拟机要做的只是把一块确定大小的内存从Java堆中划分出来</strong>，怎么划分又要分两种情况看了。</p><ol><li><strong>假设Java堆中内存时绝对规整的</strong>，所有用过的内存都放在一边，空闲的内存放在另一边，那中间再放一个指针作为分界点指示器，那分配内存只要移动指针就完事了，这种分配方式被称为<strong>指针碰撞</strong>。</li><li><strong>假设内存并不是规整的</strong>，使用的内存和空闲的内存相互交错，这时候<strong>虚拟机得维护一个列表</strong>，记录那些内存块是空闲的，分配时就从列表里找到一个够大的空间分配给实例，并更新列表，这种分配方式被称为<strong>空闲列表</strong>。</li></ol><p>选择哪种方式由<strong>Java堆是否规整来决定</strong>，而Java堆是否规整又由<strong>所采用的垃圾收集器是否带有压缩整理功能决定</strong>。</p><p>除了如何划分可用空间外，还有另外需要考虑的问题<strong>线程安全</strong>问题，可能出现正在给对象A分配内存，指针还没来得及修改，对象B又同时使用了原来的指针来分配内存的情况。解决这个问题有两种方案，<strong>一种是对分配内存空间的动作进行同步处理，另一种是把内存分配的动作按照线程划分在不同的空间之中进行，即每个线程在Java堆中预先分配一小块内存，称为本地线程分配缓冲</strong>（Thread Local Allocation Buffer,TLAB）</p><h3 id="1-3-初始化"><a href="#1-3-初始化" class="headerlink" title="1.3 初始化"></a>1.3 初始化</h3><p>内存分配完成后，<strong>虚拟机需要将分配到的内存空间都初始化为零值</strong>，<strong>如果使用了TLAB，这一工作过程也可以提前至TLAB分配时进行</strong>，这一步保证了对象实例字段在Java代码中不初始化就可以直接使用，这也是Java默认初始值的原理。</p><h3 id="1-4-进行必要的设置"><a href="#1-4-进行必要的设置" class="headerlink" title="1.4 进行必要的设置"></a>1.4 进行必要的设置</h3><p>虚拟机要对对象进行必要的设置，例如这个对象是哪个类的实例、如何才能找到类的元数据信息、对象的哈希码、对象的GC分代年龄等信息。这些信息存放在对象的对象头（Object Header）之中。根据虚拟机当前的运行状态的不同，如是否启用偏向锁等，对象头会有不同的设置方式。</p><h3 id="1-5-方法的执行"><a href="#1-5-方法的执行" class="headerlink" title="1.5 方法的执行"></a>1.5 <init>方法的执行</h3><p>虚拟机的眼中，新对象已经诞生，但是从Java程序的角度，还差最后一步，执行new指令之后会接着执行＜init＞方法，把对象按照程序员的意愿进行初始化，这样一个真正程序可用的对象才算完全产生出来。</p><h2 id="2-对象的内存布局"><a href="#2-对象的内存布局" class="headerlink" title="2. 对象的内存布局"></a>2. 对象的内存布局</h2><p>在HotSpot中，对象在堆中的存储布局可以分为三个部分：<strong>对象头（Header）、实例数据（Instance Data）和对齐填充（Padding）</strong>。</p><h3 id="2-1-对象头"><a href="#2-1-对象头" class="headerlink" title="2.1 对象头"></a>2.1 对象头</h3><p>对象头部分包括两类信息，<strong>第一类是用于存储对象自身的运行时数据</strong>，如哈希码（HashCode）、GC分代年龄、锁状态标志、线程持有的锁、偏向线程ID、偏向时间戳等。</p><p>这部分数据的长度在32位和64位的虚拟机（未开启压缩指针）中分别为32个比特和64个比特，官方称其为“Mark Word”，考虑到空间效率，它为设计为一个有着动态定义的数据结构，以便在极小的空间内存储尽量多的数据，根据对象的状态复用自己的存储空间。例如在32位的HotSpot虚拟机中，如对象未被同步锁锁定的状态<br>下，Mark Word的32个比特存储空间中的25个比特用于存储对象哈希码，4个比特用于存储对象分代年龄，2个比特用于存储锁标志位，1个比特固定为0。</p><p><strong>第二类信息是类型指针，即对象指向它的类型元数据的指针，JVM通过它来确定该对象是哪个类的实例</strong>，但并非所有JVM实现都必须保存类型指针。如果对象是一个数组，那在对象头中还必须有一块用于记录数组长度的数据，因为虚拟机可以通过普通Java对象的元数据信息确定Java对象的大小，但是如果数组的长度是不确定的，将无法通过元数据中的信息推断出数组的大小。</p><h3 id="2-2-实例数据"><a href="#2-2-实例数据" class="headerlink" title="2.2 实例数据"></a>2.2 实例数据</h3><p><strong>这部分是对象真正存储的有效信息，即我们定义的各种类型的字段，父类继承的和子类定义的字段都会被记录起来。</strong></p><p>这部分的存储顺序会受到虚拟机分配策略参数（-XX：FieldsAllocationStyle参数）和字段在Java源码中定义顺序的影响。HotSpot虚拟机默认的分配顺序为longs/doubles、ints、shorts/chars、bytes/booleans、oops（OrdinaryObject Pointers，OOPs）。</p><p>从默认的分配策略可以看出，<strong>相同宽度的字段总放在一起存放</strong>，在满足这个前提条件的情况下，在父类中定义的变量会出现在子类之前。如果HotSpot虚拟机的<br>+XX：CompactFields参数值为true（默认就为true），那子类之中较窄的变量也允许插入父类变量的空隙之中，以节省出一点点空间。</p><h3 id="2-3-对齐填充"><a href="#2-3-对齐填充" class="headerlink" title="2.3 对齐填充"></a>2.3 对齐填充</h3><p>第三部分是对齐填充，这并不是必然存在的，也没有特别的含义，<strong>它仅仅起着占位符的作用</strong>。由于HotSpot虚拟机的自动内存管理系统要求对象起始地址必须是8字节的整数倍，因此，如果对象实例数据部分没有对齐的话，就需要通过对齐填充来补全。</p><h2 id="3-对象的访问定位"><a href="#3-对象的访问定位" class="headerlink" title="3. 对象的访问定位"></a>3. 对象的访问定位</h2><p>在Java中，我们要使用一个对象，会通过栈上的reference（引用）来操作堆中的具体实例对象，在JVM规范中并没有定义引用应该通过什么方式实现，因此对象的访问方式也是因机而异，主流的方式有两种：<strong>使用句柄，直接指针</strong>。</p><h3 id="3-1-使用句柄访问"><a href="#3-1-使用句柄访问" class="headerlink" title="3.1 使用句柄访问"></a>3.1 使用句柄访问</h3><p>如果使用句柄访问的话，Java堆中将可能会划分出一块内存来作为句柄池，reference中存储的就是对象的句柄地址，而句柄中包含了对象实例数据与类型数据各自具体的地址信息。其结构如图所示</p><p><img src="https://i.loli.net/2021/08/14/xIQegjKZid8sabE.png"></p><p>使用句柄访问的最大好处是reference中存储的是稳定句柄地址，在对象被移动（垃圾收集时移动对象是非常普遍的行为）时只会改变句柄中的实例数据指针，而reference本身不需要被修改。</p><h3 id="3-2-使用直接指针访问"><a href="#3-2-使用直接指针访问" class="headerlink" title="3.2 使用直接指针访问"></a>3.2 使用直接指针访问</h3><p>·如果使用直接指针访问的话，Java堆中对象的内存布局就必须考虑如何放置访问类型数据的相关信息，reference中存储的直接就是对象地址，如果只是访问对象本身的话，就不需要多一次间接访问的开销，如图所示</p><p><img src="https://i.loli.net/2021/08/14/R7vA2Vz5k3yfWrj.png"></p><p>使用直接指针来访问最大的好处就是速度更快，它节省了一次指针定位的时间开销，由于对象访问在Java中非常频繁，因此这类开销积少成多也是一项极为可观的执行成本，就本书讨论的主要虚拟机HotSpot而言，它主要使用第二种方式进行对象访问。</p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;h1 id=&quot;HotSpot虚拟机对象探秘&quot;&gt;&lt;a href=&quot;#HotSpot虚拟机对象探秘&quot; class=&quot;headerlink&quot; title=&quot;HotSpot虚拟机对象探秘&quot;&gt;&lt;/a&gt;HotSpot虚拟机对象探秘&lt;/h1&gt;&lt;h2 id=&quot;1-对象的创建&quot;&gt;&lt;a href=</summary>
+      
+    
+    
+    
+    <category term="学习笔记" scheme="https://saw96x.github.io/categories/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/"/>
+    
+    
+    <category term="Java" scheme="https://saw96x.github.io/tags/Java/"/>
+    
+    <category term="JVM" scheme="https://saw96x.github.io/tags/JVM/"/>
+    
+    <category term="深入理解Java虚拟机" scheme="https://saw96x.github.io/tags/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3Java%E8%99%9A%E6%8B%9F%E6%9C%BA/"/>
+    
+  </entry>
   
   <entry>
     <title>带图形界面的贪吃蛇</title>
@@ -70,34 +98,6 @@
     <category term="深入理解Java虚拟机" scheme="https://saw96x.github.io/tags/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3Java%E8%99%9A%E6%8B%9F%E6%9C%BA/"/>
     
     <category term="源码分析" scheme="https://saw96x.github.io/tags/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>HotSpot虚拟机对象探秘</title>
-    <link href="https://saw96x.github.io/post/HotSpot%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%AF%B9%E8%B1%A1%E6%8E%A2%E7%A7%98.html"/>
-    <id>https://saw96x.github.io/post/HotSpot%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%AF%B9%E8%B1%A1%E6%8E%A2%E7%A7%98.html</id>
-    <published>2021-08-12T02:55:37.000Z</published>
-    <updated>2021-08-13T03:30:24.139Z</updated>
-    
-    <content type="html"><![CDATA[<h1 id="HotSpot虚拟机对象探秘"><a href="#HotSpot虚拟机对象探秘" class="headerlink" title="HotSpot虚拟机对象探秘"></a>HotSpot虚拟机对象探秘</h1><h2 id="1-对象的创建"><a href="#1-对象的创建" class="headerlink" title="1. 对象的创建"></a>1. 对象的创建</h2><h3 id="1-1-类加载检查"><a href="#1-1-类加载检查" class="headerlink" title="1.1 类加载检查"></a>1.1 类加载检查</h3><p>虚拟机遇到new之后，首先会去常量池中找这个类的<strong>符号引用</strong>，并检查这个符号引用代表的类是否已经被加载、解析和初始化过，如果找到了，就可以根据已有的信息划分空间、分配内存、初始化等等；<strong>如果没找到，那必须先执行相应的类加载过程</strong>，类加载过程以后的笔记在详细说明。</p><h3 id="1-2-内存分配"><a href="#1-2-内存分配" class="headerlink" title="1.2 内存分配"></a>1.2 内存分配</h3><p>类加载检查通过之后，虚拟机将为新生对象分配内存，所需内存大小在类加载完成后就已经完全确定了，<strong>虚拟机要做的只是把一块确定大小的内存从Java堆中划分出来</strong>，怎么划分又要分两种情况看了。</p><ol><li><strong>假设Java堆中内存时绝对规整的</strong>，所有用过的内存都放在一边，空闲的内存放在另一边，那中间再放一个指针作为分界点指示器，那分配内存只要移动指针就完事了，这种分配方式被称为<strong>指针碰撞</strong>。</li><li><strong>假设内存并不是规整的</strong>，使用的内存和空闲的内存相互交错，这时候<strong>虚拟机得维护一个列表</strong>，记录那些内存块是空闲的，分配时就从列表里找到一个够大的空间分配给实例，并更新列表，这种分配方式被称为<strong>空闲列表</strong>。</li></ol><p>选择哪种方式由<strong>Java堆是否规整来决定</strong>，而Java堆是否规整又由<strong>所采用的垃圾收集器是否带有压缩整理功能决定</strong>。</p><p>除了如何划分可用空间外，还有另外需要考虑的问题<strong>线程安全</strong>问题，可能出现正在给对象A分配内存，指针还没来得及修改，对象B又同时使用了原来的指针来分配内存的情况。解决这个问题有两种方案，<strong>一种是对分配内存空间的动作进行同步处理，另一种是把内存分配的动作按照线程划分在不同的空间之中进行，即每个线程在Java堆中预先分配一小块内存，称为本地线程分配缓冲</strong>（Thread Local Allocation Buffer,TLAB）</p><h3 id="1-3-初始化"><a href="#1-3-初始化" class="headerlink" title="1.3 初始化"></a>1.3 初始化</h3><p>内存分配完成后，<strong>虚拟机需要将分配到的内存空间都初始化为零值</strong>，<strong>如果使用了TLAB，这一工作过程也可以提前至TLAB分配时进行</strong>，这一步保证了对象实例字段在Java代码中不初始化就可以直接使用，这也是Java默认初始值的原理。</p><h3 id="1-4-进行必要的设置"><a href="#1-4-进行必要的设置" class="headerlink" title="1.4 进行必要的设置"></a>1.4 进行必要的设置</h3><p>虚拟机要对对象进行必要的设置，例如这个对象是哪个类的实例、如何才能找到类的元数据信息、对象的哈希码、对象的GC分代年龄等信息。这些信息存放在对象的对象头（Object Header）之中。根据虚拟机当前的运行状态的不同，如是否启用偏向锁等，对象头会有不同的设置方式。</p><h3 id="1-5-方法的执行"><a href="#1-5-方法的执行" class="headerlink" title="1.5 方法的执行"></a>1.5 <init>方法的执行</h3><p>虚拟机的眼中，新对象已经诞生，但是从Java程序的角度，还差最后一步，执行new指令之后会接着执行＜init＞方法，把对象按照程序员的意愿进行初始化，这样一个真正程序可用的对象才算完全产生出来。</p><h2 id="2-对象的内存布局"><a href="#2-对象的内存布局" class="headerlink" title="2. 对象的内存布局"></a>2. 对象的内存布局</h2>]]></content>
-    
-    
-      
-      
-    <summary type="html">&lt;h1 id=&quot;HotSpot虚拟机对象探秘&quot;&gt;&lt;a href=&quot;#HotSpot虚拟机对象探秘&quot; class=&quot;headerlink&quot; title=&quot;HotSpot虚拟机对象探秘&quot;&gt;&lt;/a&gt;HotSpot虚拟机对象探秘&lt;/h1&gt;&lt;h2 id=&quot;1-对象的创建&quot;&gt;&lt;a href=</summary>
-      
-    
-    
-    
-    <category term="学习笔记" scheme="https://saw96x.github.io/categories/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/"/>
-    
-    
-    <category term="Java" scheme="https://saw96x.github.io/tags/Java/"/>
-    
-    <category term="JVM" scheme="https://saw96x.github.io/tags/JVM/"/>
-    
-    <category term="深入理解Java虚拟机" scheme="https://saw96x.github.io/tags/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3Java%E8%99%9A%E6%8B%9F%E6%9C%BA/"/>
     
   </entry>
   
